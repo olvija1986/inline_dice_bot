@@ -1,23 +1,13 @@
-import os
-import random
-import uuid
-import asyncio
-from fastapi import FastAPI
 from telegram import InlineQueryResultArticle, InputTextMessageContent, Update
 from telegram.ext import ApplicationBuilder, InlineQueryHandler, ContextTypes
+import random, uuid, os, threading
+from fastapi import FastAPI
+import uvicorn
 
-# ===== Переменные окружения =====
+# ================== Telegram Token ==================
 TOKEN = os.environ.get("TOKEN")
-PORT = int(os.environ.get("PORT", 10000))  # Render назначает порт в $PORT
 
-# ===== FastAPI для Render =====
-fastapi_app = FastAPI()
-
-@fastapi_app.get("/")
-async def root():
-    return {"status": "ok"}  # простой эндпоинт для проверки работы сервиса
-
-# ===== Telegram бот =====
+# ================== Inline-запросы ==================
 async def inline_roll(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.inline_query.query.strip()
     if not query:
@@ -28,9 +18,11 @@ async def inline_roll(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if max_num < 1:
             return
 
+        # Генерируем случайное число
         result = random.randint(1, max_num)
         text = f"🎲 Выпало: {result} из {max_num}"
 
+        # Возвращаем inline-результат
         await update.inline_query.answer(
             results=[
                 InlineQueryResultArticle(
@@ -51,14 +43,24 @@ async def inline_roll(update: Update, context: ContextTypes.DEFAULT_TYPE):
             switch_pm_parameter="start"
         )
 
-# ===== Создаём Telegram приложение =====
-tg_app = ApplicationBuilder().token(TOKEN).build()
-tg_app.add_handler(InlineQueryHandler(inline_roll))
+# ================== Telegram App ==================
+app = ApplicationBuilder().token(TOKEN).build()
+app.add_handler(InlineQueryHandler(inline_roll))
 
-# ===== Запуск Telegram polling в фоне =====
-@fastapi_app.on_event("startup")
-async def startup_event():
-    asyncio.create_task(tg_app.run_polling())
+# ================== Web Server (для Render) ==================
+web_app = FastAPI()
 
-# ===== Запуск через uvicorn (для Render) =====
-# render автоматически вызовет `uvicorn bot:fastapi_app --host 0.0.0.0 --port $PORT`
+@web_app.get("/")
+def home():
+    return {"status": "ok", "message": "🎲 Inline Dice Bot is running!"}
+
+def run_bot():
+    app.run_polling()
+
+if __name__ == "__main__":
+    # Запускаем Telegram-бота в отдельном потоке
+    threading.Thread(target=run_bot, daemon=True).start()
+
+    # Запускаем FastAPI-сервер
+    port = int(os.environ.get("PORT", 10000))
+    uvicorn.run(web_app, host="0.0.0.0", port=port)
