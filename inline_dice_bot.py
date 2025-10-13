@@ -6,14 +6,17 @@ from telegram import Update, InlineQueryResultArticle, InputTextMessageContent
 from telegram.ext import ApplicationBuilder, InlineQueryHandler, ContextTypes
 
 # ================== Настройки ==================
-TOKEN = os.environ["TOKEN"]
-BOT_URL = os.environ.get("BOT_URL")  # Пример: https://inline-dice-bot-7xye.onrender.com
+TOKEN = os.environ["TOKEN"]  # токен бота
+BOT_URL = os.environ.get("BOT_URL")  # например: https://inline-dice-bot-7xye.onrender.com
 WEBHOOK_PATH = f"/webhook/{TOKEN}"
 
-# FastAPI приложение
-app = FastAPI()
+if not TOKEN:
+    raise RuntimeError("Не задана переменная окружения TOKEN")
+if not BOT_URL:
+    raise RuntimeError("Не задана переменная окружения BOT_URL")
 
-# Telegram бот
+# ================== FastAPI ==================
+app = FastAPI()
 bot_app = ApplicationBuilder().token(TOKEN).build()
 
 # ================== Inline-запрос ==================
@@ -56,16 +59,13 @@ bot_app.add_handler(InlineQueryHandler(inline_roll))
 async def telegram_webhook(request: Request):
     """Обрабатываем обновления от Telegram через webhook"""
     data = await request.json()
-    update = Update.from_dict(data, bot_app.bot)  # ⚠ исправлено для PTB v20+
+    update = Update.de_json(data, bot=bot_app.bot)  # ⚡ PTB v20+
     await bot_app.update_queue.put(update)
     return {"ok": True}
 
 # ================== Lifespan: установка webhook при старте ==================
 @app.on_event("startup")
 async def startup_event():
-    if not BOT_URL:
-        raise RuntimeError("Не задана переменная окружения BOT_URL")
-    
     await bot_app.bot.set_webhook(f"{BOT_URL}{WEBHOOK_PATH}")
     print("✅ Webhook установлен, бот готов к работе")
 
