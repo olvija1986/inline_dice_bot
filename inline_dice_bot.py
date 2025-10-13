@@ -1,12 +1,14 @@
 import os
 import random
 import uuid
+import asyncio
+import httpx
 from fastapi import FastAPI, Request
 from telegram import Update, InlineQueryResultArticle, InputTextMessageContent
 from telegram.ext import ApplicationBuilder, InlineQueryHandler, ContextTypes
 
 # ================== Настройки ==================
-TOKEN = os.environ["TOKEN"]  # токен бота
+TOKEN = os.environ.get("TOKEN")  # токен бота
 BOT_URL = os.environ.get("BOT_URL")  # например: https://inline-dice-bot-7xye.onrender.com
 WEBHOOK_PATH = f"/webhook/{TOKEN}"
 
@@ -55,7 +57,7 @@ bot_app.add_handler(InlineQueryHandler(inline_roll))
 async def telegram_webhook(request: Request):
     data = await request.json()
     update = Update.de_json(data, bot_app.bot)
-    await bot_app.update_queue.put(update)  # ⚡ очередь для PTB v20+
+    await bot_app.update_queue.put(update)
     return {"ok": True}
 
 # ================== Lifespan ==================
@@ -68,6 +70,18 @@ async def startup_event():
     # Запускаем обработку очереди обновлений
     await bot_app.start()
     print("✅ Webhook установлен, бот готов к работе")
+
+    # ================== Ping task ==================
+    async def ping_self():
+        async with httpx.AsyncClient() as client:
+            while True:
+                try:
+                    await client.get(BOT_URL)
+                except Exception as e:
+                    print(f"Ping error: {e}")
+                await asyncio.sleep(600)  # каждые 10 минут
+
+    asyncio.create_task(ping_self())
 
 @app.on_event("shutdown")
 async def shutdown_event():
