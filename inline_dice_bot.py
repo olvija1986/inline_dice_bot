@@ -10,14 +10,15 @@ from telegram.ext import ApplicationBuilder, InlineQueryHandler, ContextTypes
 # === Настройки ===
 TOKEN = os.environ.get("TOKEN")
 
-app = FastAPI()  # нужен, чтобы Render видел порт
+app = FastAPI()
 bot_app = ApplicationBuilder().token(TOKEN).build()
 
-# === Логика inline ===
+# === Inline логика ===
 async def inline_roll(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.inline_query.query.strip()
     if not query:
         return
+
     try:
         max_num = int(query)
         if max_num < 1:
@@ -47,15 +48,20 @@ async def inline_roll(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 bot_app.add_handler(InlineQueryHandler(inline_roll))
 
-# === Фоновой запуск бота ===
+# === Функция для фонового запуска бота ===
 def run_bot():
     asyncio.run(bot_app.run_polling())
 
+# === Lifespan (новый способ вместо @app.on_event) ===
 @app.on_event("startup")
-def startup_event():
-    Thread(target=run_bot, daemon=True).start()
+async def start_bot():
+    thread = Thread(target=run_bot, daemon=True)
+    thread.start()
+    print("✅ Telegram Bot запущен в фоне")
 
-# === Render Web порт ===
 @app.get("/")
 def home():
     return {"status": "Bot is running ✅"}
+
+# === Запуск приложения (Render сам запустит через uvicorn) ===
+# Никакого app.run_polling() здесь!
