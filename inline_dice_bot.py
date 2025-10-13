@@ -1,21 +1,23 @@
 import os
 import random
 import uuid
-from fastapi import FastAPI
-from telegram import InlineQueryResultArticle, InputTextMessageContent, Update
+from fastapi import FastAPI, Request
+from telegram import Update, InlineQueryResultArticle, InputTextMessageContent
 from telegram.ext import ApplicationBuilder, InlineQueryHandler, ContextTypes
 
-# ================= Настройки =================
-TOKEN = os.environ.get("TOKEN")  # Убедитесь, что переменная окружения установлена
+# ================== Настройки ==================
+TOKEN = os.environ["TOKEN"]
+WEBHOOK_PATH = f"/webhook/{TOKEN}"
 
 app = FastAPI()
 bot_app = ApplicationBuilder().token(TOKEN).build()
 
-# ================= Inline логика =================
+# ================== Inline-запрос ==================
 async def inline_roll(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.inline_query.query.strip()
     if not query:
         return
+
     try:
         max_num = int(query)
         if max_num < 1:
@@ -36,7 +38,6 @@ async def inline_roll(update: Update, context: ContextTypes.DEFAULT_TYPE):
             ],
             cache_time=0
         )
-
     except ValueError:
         await update.inline_query.answer(
             results=[],
@@ -46,14 +47,16 @@ async def inline_roll(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 bot_app.add_handler(InlineQueryHandler(inline_roll))
 
-# ================= Запуск бота вместе с FastAPI =================
-@app.on_event("startup")
-async def start_bot():
-    await bot_app.initialize()      # инициализация
-    await bot_app.start_polling()   # запуск polling асинхронно
-    print("✅ Telegram Bot запущен")
+# ================== Webhook endpoint ==================
+@app.post(WEBHOOK_PATH)
+async def telegram_webhook(request: Request):
+    """Обрабатываем обновления от Telegram через webhook"""
+    data = await request.json()
+    update = Update.de_json(data, bot_app.bot)
+    await bot_app.update_queue.put(update)
+    return {"ok": True}
 
-# ================= HTTP endpoint для Render =================
+# ================== Стартовая страница ==================
 @app.get("/")
-def home():
+def root():
     return {"status": "Bot is running ✅"}
