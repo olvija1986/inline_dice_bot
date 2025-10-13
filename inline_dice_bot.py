@@ -2,8 +2,9 @@ import os
 import random
 import uuid
 import asyncio
-from threading import Thread
-from contextlib import asynccontextmanager
+import threading
+import requests
+import time
 from fastapi import FastAPI
 from telegram import InlineQueryResultArticle, InputTextMessageContent, Update
 from telegram.ext import ApplicationBuilder, InlineQueryHandler, ContextTypes
@@ -11,6 +12,8 @@ from telegram.ext import ApplicationBuilder, InlineQueryHandler, ContextTypes
 # === Настройки ===
 TOKEN = os.environ.get("TOKEN")
 
+# === FastAPI приложение ===
+app = FastAPI()
 bot_app = ApplicationBuilder().token(TOKEN).build()
 
 # === Inline логика ===
@@ -48,17 +51,31 @@ async def inline_roll(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 bot_app.add_handler(InlineQueryHandler(inline_roll))
 
-# === Lifespan API (новый способ) ===
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    thread = Thread(target=lambda: asyncio.run(bot_app.run_polling()), daemon=True)
+# === Функция для фонового запуска бота ===
+def run_bot():
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    loop.run_until_complete(bot_app.run_polling())
+
+# === Lifespan (новый способ старта) ===
+@app.on_event("startup")
+async def start_bot():
+    thread = threading.Thread(target=run_bot, daemon=True)
     thread.start()
     print("✅ Telegram Bot запущен в фоне")
-    yield
-    print("🛑 Остановка приложения")
 
-# === Инициализация FastAPI ===
-app = FastAPI(lifespan=lifespan)
+# === Keep-alive пингер, чтобы Render не засыпал ===
+def keep_alive():
+    url = "https://inline-dice-bot-7xye.onrender.com"  # 🔹 замени на свой Render URL
+    while True:
+        try:
+            requests.get(url)
+            print("🔄 Ping sent to Render")
+        except Exception as e:
+            print(f"⚠️ Ping failed: {e}")
+        time.sleep(600)  # каждые 10 минут
+
+threading.Thread(target=keep_alive, daemon=True).start()
 
 @app.get("/")
 def home():
