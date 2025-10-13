@@ -2,15 +2,15 @@ import os
 import random
 import uuid
 import asyncio
-from fastapi import FastAPI
 from threading import Thread
+from contextlib import asynccontextmanager
+from fastapi import FastAPI
 from telegram import InlineQueryResultArticle, InputTextMessageContent, Update
 from telegram.ext import ApplicationBuilder, InlineQueryHandler, ContextTypes
 
 # === Настройки ===
 TOKEN = os.environ.get("TOKEN")
 
-app = FastAPI()
 bot_app = ApplicationBuilder().token(TOKEN).build()
 
 # === Inline логика ===
@@ -48,20 +48,18 @@ async def inline_roll(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 bot_app.add_handler(InlineQueryHandler(inline_roll))
 
-# === Функция для фонового запуска бота ===
-def run_bot():
-    asyncio.run(bot_app.run_polling())
-
-# === Lifespan (новый способ вместо @app.on_event) ===
-@app.on_event("startup")
-async def start_bot():
-    thread = Thread(target=run_bot, daemon=True)
+# === Lifespan API (новый способ) ===
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    thread = Thread(target=lambda: asyncio.run(bot_app.run_polling()), daemon=True)
     thread.start()
     print("✅ Telegram Bot запущен в фоне")
+    yield
+    print("🛑 Остановка приложения")
+
+# === Инициализация FastAPI ===
+app = FastAPI(lifespan=lifespan)
 
 @app.get("/")
 def home():
     return {"status": "Bot is running ✅"}
-
-# === Запуск приложения (Render сам запустит через uvicorn) ===
-# Никакого app.run_polling() здесь!
