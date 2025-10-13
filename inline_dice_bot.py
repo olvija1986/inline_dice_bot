@@ -10,10 +10,8 @@ TOKEN = os.environ["TOKEN"]  # токен бота
 BOT_URL = os.environ.get("BOT_URL")  # например: https://inline-dice-bot-7xye.onrender.com
 WEBHOOK_PATH = f"/webhook/{TOKEN}"
 
-if not TOKEN:
-    raise RuntimeError("Не задана переменная окружения TOKEN")
-if not BOT_URL:
-    raise RuntimeError("Не задана переменная окружения BOT_URL")
+if not TOKEN or not BOT_URL:
+    raise RuntimeError("Не заданы переменные окружения TOKEN или BOT_URL")
 
 # ================== FastAPI ==================
 app = FastAPI()
@@ -24,12 +22,10 @@ async def inline_roll(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.inline_query.query.strip()
     if not query:
         return
-
     try:
         max_num = int(query)
         if max_num < 1:
             return
-
         result = random.randint(1, max_num)
         text = f"🎲 Выпало: {result} из {max_num}"
 
@@ -57,17 +53,27 @@ bot_app.add_handler(InlineQueryHandler(inline_roll))
 # ================== Webhook endpoint ==================
 @app.post(WEBHOOK_PATH)
 async def telegram_webhook(request: Request):
-    """Обрабатываем обновления от Telegram через webhook"""
     data = await request.json()
-    update = Update.de_json(data, bot=bot_app.bot)  # ⚡ PTB v20+
-    await bot_app.update_queue.put(update)
+    update = Update.de_json(data, bot_app.bot)
+    await bot_app.update_queue.put(update)  # ⚡ очередь для PTB v20+
     return {"ok": True}
 
-# ================== Lifespan: установка webhook при старте ==================
+# ================== Lifespan ==================
 @app.on_event("startup")
 async def startup_event():
+    # Инициализируем очередь
+    await bot_app.initialize()
+    # Устанавливаем webhook
     await bot_app.bot.set_webhook(f"{BOT_URL}{WEBHOOK_PATH}")
+    # Запускаем обработку очереди обновлений
+    await bot_app.start()
     print("✅ Webhook установлен, бот готов к работе")
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    await bot_app.stop()
+    await bot_app.shutdown()
+    print("🛑 Бот остановлен")
 
 # ================== Стартовая страница ==================
 @app.get("/")
