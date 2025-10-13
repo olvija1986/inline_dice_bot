@@ -5,22 +5,28 @@ from fastapi import FastAPI, Request
 from telegram import Update, InlineQueryResultArticle, InputTextMessageContent
 from telegram.ext import ApplicationBuilder, InlineQueryHandler, ContextTypes
 
+# ================== Настройки ==================
 TOKEN = os.environ["TOKEN"]
+BOT_URL = os.environ.get("BOT_URL")  # https://inline-dice-bot-7xye.onrender.com
 WEBHOOK_PATH = f"/webhook/{TOKEN}"
-BOT_URL = f"https://inline-dice-bot-7xye.onrender.com{WEBHOOK_PATH}"
 
 app = FastAPI()
 bot_app = ApplicationBuilder().token(TOKEN).build()
 
-# === Inline-запрос ===
+# ================== Inline-запрос ==================
 async def inline_roll(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.inline_query.query.strip()
     if not query:
         return
+
     try:
         max_num = int(query)
+        if max_num < 1:
+            return
+
         result = random.randint(1, max_num)
         text = f"🎲 Выпало: {result} из {max_num}"
+
         await update.inline_query.answer(
             results=[
                 InlineQueryResultArticle(
@@ -42,15 +48,25 @@ async def inline_roll(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 bot_app.add_handler(InlineQueryHandler(inline_roll))
 
-# === Webhook endpoint ===
+# ================== Webhook endpoint ==================
 @app.post(WEBHOOK_PATH)
 async def telegram_webhook(request: Request):
+    """Обрабатываем обновления от Telegram через webhook"""
     data = await request.json()
     update = Update.de_json(data, bot_app.bot)
     await bot_app.update_queue.put(update)
     return {"ok": True}
 
-# === Стартовая страница ===
+# ================== Lifespan: установка webhook при старте ==================
+@app.on_event("startup")
+async def startup_event():
+    if not BOT_URL:
+        raise RuntimeError("Не задана переменная окружения BOT_URL")
+    # Устанавливаем webhook у Telegram
+    await bot_app.bot.set_webhook(f"{BOT_URL}{WEBHOOK_PATH}")
+    print("✅ Webhook установлен, бот готов к работе")
+
+# ================== Стартовая страница ==================
 @app.get("/")
 def root():
     return {"status": "Bot is running ✅"}
