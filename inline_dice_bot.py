@@ -2,6 +2,7 @@ from telegram import InlineQueryResultArticle, InputTextMessageContent, Update
 from telegram.ext import ApplicationBuilder, InlineQueryHandler, ContextTypes
 import random, uuid, os
 
+# Берём токен из переменной окружения
 TOKEN = os.environ.get("TOKEN")
 
 async def inline_roll(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -13,20 +14,35 @@ async def inline_roll(update: Update, context: ContextTypes.DEFAULT_TYPE):
         max_num = int(query)
         if max_num < 1:
             return
+
+        # Генерируем число только для отправки сообщения
         result = random.randint(1, max_num)
         text = f"🎲 Выпало: {result} из {max_num}"
 
-        await update.inline_query.answer([
-            InlineQueryResultArticle(
-                id=str(uuid.uuid4()),
-                title="🎲 Рандом",
-                input_message_content=InputTextMessageContent(text),
-            )
-        ], cache_time=0)
+        # Inline результат
+        await update.inline_query.answer(
+            results=[
+                InlineQueryResultArticle(
+                    id=str(uuid.uuid4()),
+                    title="🎲 Генерировать число",             # текст в сниппете
+                    description="Нажми, чтобы узнать число",  # описание в сниппете
+                    input_message_content=InputTextMessageContent(text),
+                    thumb_url="https://upload.wikimedia.org/wikipedia/commons/2/2c/OOjs_UI_icon_die-labeled.svg"  # картинка в превью
+                )
+            ],
+            cache_time=0  # всегда свежий результат
+        )
 
     except ValueError:
-        await update.inline_query.answer([], switch_pm_text="Введите число, например: 100", switch_pm_parameter="start")
+        await update.inline_query.answer(
+            results=[],
+            switch_pm_text="Введите число, например: 100",
+            switch_pm_parameter="start"
+        )
 
+# Создаём приложение и добавляем обработчик inline-запросов
 app = ApplicationBuilder().token(TOKEN).build()
 app.add_handler(InlineQueryHandler(inline_roll))
+
+# Запускаем бота
 app.run_polling()
