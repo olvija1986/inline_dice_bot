@@ -24,6 +24,43 @@ async def inline_roll(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.inline_query.query.strip()
     if not query:
         return
+
+    # --- Новая логика: случайный выбор ✅ или ❌ ---
+    if query == "?":
+        result_emoji = random.choice(["✅", "❌"])
+        text = f"{result_emoji}"
+        await update.inline_query.answer(
+            results=[
+                InlineQueryResultArticle(
+                    id=str(uuid.uuid4()),
+                    title="✅❌ Случайный выбор",
+                    description="Реши случайно — да или нет",
+                    input_message_content=InputTextMessageContent(text),
+                    thumb_url="https://cdn-icons-png.flaticon.com/512/4436/4436481.png"
+                )
+            ],
+            cache_time=0
+        )
+        return
+
+    # --- Новая логика: если введено число 6, то просто 🎲 ---
+    if query == "6":
+        text = "🎲"
+        await update.inline_query.answer(
+            results=[
+                InlineQueryResultArticle(
+                    id=str(uuid.uuid4()),
+                    title="🎲 Кость",
+                    description="Случайная кость",
+                    input_message_content=InputTextMessageContent(text),
+                    thumb_url="https://cdn-icons-png.flaticon.com/512/4100/4100836.png"
+                )
+            ],
+            cache_time=0
+        )
+        return
+
+    # --- Обычная логика: генерируем случайное число ---
     try:
         max_num = int(query)
         if max_num < 1:
@@ -63,15 +100,11 @@ async def telegram_webhook(request: Request):
 # ================== Lifespan ==================
 @app.on_event("startup")
 async def startup_event():
-    # Инициализируем очередь
     await bot_app.initialize()
-    # Устанавливаем webhook
     await bot_app.bot.set_webhook(f"{BOT_URL}{WEBHOOK_PATH}")
-    # Запускаем обработку очереди обновлений
     await bot_app.start()
     print("✅ Webhook установлен, бот готов к работе")
 
-    # ================== Ping task ==================
     async def ping_self():
         async with httpx.AsyncClient() as client:
             while True:
@@ -79,7 +112,7 @@ async def startup_event():
                     await client.get(BOT_URL)
                 except Exception as e:
                     print(f"Ping error: {e}")
-                await asyncio.sleep(600)  # каждые 10 минут
+                await asyncio.sleep(600)
 
     asyncio.create_task(ping_self())
 
