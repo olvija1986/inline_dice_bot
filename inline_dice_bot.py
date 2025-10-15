@@ -25,6 +25,25 @@ async def inline_roll(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not query:
         return
 
+    # --- Новая логика: семья или эмодзи 👩‍👩‍👦 ---
+    if query.lower() == "семья" or query == "👩‍👩‍👦":
+        family_members = ["Саша", "Оля", "Митя", "Сева", "Лана", "Макс", "Алиса"]
+        chosen = random.choice(family_members)
+        text = f"👩‍👩‍👦 Семья выбрала: {chosen}"
+        await update.inline_query.answer(
+            results=[
+                InlineQueryResultArticle(
+                    id=str(uuid.uuid4()),
+                    title="👩‍👩‍👦 Случайный выбор из семьи",
+                    description="Выбирает случайного члена семьи",
+                    input_message_content=InputTextMessageContent(text),
+                    thumb_url="https://cdn-icons-png.flaticon.com/512/2922/2922561.png",
+                )
+            ],
+            cache_time=0,
+        )
+        return
+
     # --- Логика: случайный выбор ✅ или ❌ ---
     if query == "?":
         result_emoji = random.choice(["✅", "❌"])
