@@ -4,19 +4,8 @@ import uuid
 import asyncio
 import httpx
 from fastapi import FastAPI, Request
-from telegram import (
-    Update,
-    InlineQueryResultArticle,
-    InputTextMessageContent,
-    InlineKeyboardMarkup,
-    InlineKeyboardButton,
-)
-from telegram.ext import (
-    ApplicationBuilder,
-    InlineQueryHandler,
-    CallbackQueryHandler,
-    ContextTypes,
-)
+from telegram import Update, InlineQueryResultArticle, InputTextMessageContent
+from telegram.ext import ApplicationBuilder, InlineQueryHandler, ContextTypes
 
 # ================== Настройки ==================
 TOKEN = os.environ.get("TOKEN")  # токен бота
@@ -47,35 +36,14 @@ async def inline_roll(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     title="✅❌ Случайный выбор",
                     description="Получи ответ — да или нет",
                     input_message_content=InputTextMessageContent(text),
-                    thumb_url="https://png.klev.club/uploads/posts/2024-03/png-klev-club-p-vopros-png-6.png",
+                    thumb_url="https://png.pngtree.com/png-clipart/20220221/ourmid/pngtree-3d-question-sign-front-view-png-image_4443823.png",
                 )
             ],
             cache_time=0,
         )
         return
 
-    # --- Логика: если введено число 6 — показать кнопку броска кубика ---
-    if query == "6":
-        text = "🎲 Хочешь бросить настоящий кубик?"
-        keyboard = InlineKeyboardMarkup(
-            [[InlineKeyboardButton("🎲 Бросить кубик", callback_data="roll_dice")]]
-        )
-        await update.inline_query.answer(
-            results=[
-                InlineQueryResultArticle(
-                    id=str(uuid.uuid4()),
-                    title="🎲 Кубик",
-                    description="Случайная кость (нажми кнопку)",
-                    input_message_content=InputTextMessageContent(text),
-                    reply_markup=keyboard,
-                    thumb_url="https://cdn-icons-png.flaticon.com/512/4100/4100836.png",
-                )
-            ],
-            cache_time=0,
-        )
-        return
-
-    # --- Обычная логика: генерируем случайное число ---
+    # --- Логика: обычное число ---
     try:
         max_num = int(query)
         if max_num < 1:
@@ -102,17 +70,8 @@ async def inline_roll(update: Update, context: ContextTypes.DEFAULT_TYPE):
             switch_pm_parameter="start",
         )
 
-
-# ================== Callback: бросок кубика ==================
-async def handle_dice_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()  # закрываем "загрузка..."
-    await context.bot.send_dice(chat_id=query.message.chat.id, emoji="🎲")
-
-
-# ================== Регистрация хендлеров ==================
+# ================== Регистрация хендлера ==================
 bot_app.add_handler(InlineQueryHandler(inline_roll))
-bot_app.add_handler(CallbackQueryHandler(handle_dice_callback, pattern="^roll_dice$"))
 
 # ================== Webhook endpoint ==================
 @app.post(WEBHOOK_PATH)
