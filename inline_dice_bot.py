@@ -4,8 +4,19 @@ import uuid
 import asyncio
 import httpx
 from fastapi import FastAPI, Request
-from telegram import Update, InlineQueryResultArticle, InputTextMessageContent
-from telegram.ext import ApplicationBuilder, InlineQueryHandler, ContextTypes
+from telegram import (
+    Update,
+    InlineQueryResultArticle,
+    InputTextMessageContent,
+    InlineKeyboardMarkup,
+    InlineKeyboardButton,
+)
+from telegram.ext import (
+    ApplicationBuilder,
+    InlineQueryHandler,
+    CallbackQueryHandler,
+    ContextTypes,
+)
 
 # ================== Настройки ==================
 TOKEN = os.environ.get("TOKEN")  # токен бота
@@ -25,7 +36,7 @@ async def inline_roll(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not query:
         return
 
-    # --- Новая логика: случайный выбор ✅ или ❌ ---
+    # --- Логика: случайный выбор ✅ или ❌ ---
     if query == "?":
         result_emoji = random.choice(["✅", "❌"])
         text = f"{result_emoji}"
@@ -34,29 +45,33 @@ async def inline_roll(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 InlineQueryResultArticle(
                     id=str(uuid.uuid4()),
                     title="✅❌ Случайный выбор",
-                    description="Реши случайно — да или нет",
+                    description="Получи ответ — да или нет",
                     input_message_content=InputTextMessageContent(text),
-                    thumb_url="https://cdn-icons-png.flaticon.com/512/4436/4436481.png"
+                    thumb_url="https://png.klev.club/uploads/posts/2024-03/png-klev-club-p-vopros-png-6.png",
                 )
             ],
-            cache_time=0
+            cache_time=0,
         )
         return
 
-    # --- Новая логика: если введено число 6, то просто 🎲 ---
+    # --- Логика: если введено число 6 — показать кнопку броска кубика ---
     if query == "6":
-        text = "🎲"
+        text = "🎲 Хочешь бросить настоящий кубик?"
+        keyboard = InlineKeyboardMarkup(
+            [[InlineKeyboardButton("🎲 Бросить кубик", callback_data="roll_dice")]]
+        )
         await update.inline_query.answer(
             results=[
                 InlineQueryResultArticle(
                     id=str(uuid.uuid4()),
-                    title="🎲 Кость",
-                    description="Случайная кость",
+                    title="🎲 Кубик",
+                    description="Случайная кость (нажми кнопку)",
                     input_message_content=InputTextMessageContent(text),
-                    thumb_url="https://cdn-icons-png.flaticon.com/512/4100/4100836.png"
+                    reply_markup=keyboard,
+                    thumb_url="https://cdn-icons-png.flaticon.com/512/4100/4100836.png",
                 )
             ],
-            cache_time=0
+            cache_time=0,
         )
         return
 
@@ -75,19 +90,29 @@ async def inline_roll(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     title="🎲 Генерировать число",
                     description="Нажми, чтобы узнать число",
                     input_message_content=InputTextMessageContent(text),
-                    thumb_url="https://cdn-icons-png.flaticon.com/512/4100/4100836.png"
+                    thumb_url="https://cdn-icons-png.flaticon.com/512/4100/4100836.png",
                 )
             ],
-            cache_time=0
+            cache_time=0,
         )
     except ValueError:
         await update.inline_query.answer(
             results=[],
             switch_pm_text="Введите число, например: 100",
-            switch_pm_parameter="start"
+            switch_pm_parameter="start",
         )
 
+
+# ================== Callback: бросок кубика ==================
+async def handle_dice_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()  # закрываем "загрузка..."
+    await context.bot.send_dice(chat_id=query.message.chat.id, emoji="🎲")
+
+
+# ================== Регистрация хендлеров ==================
 bot_app.add_handler(InlineQueryHandler(inline_roll))
+bot_app.add_handler(CallbackQueryHandler(handle_dice_callback, pattern="^roll_dice$"))
 
 # ================== Webhook endpoint ==================
 @app.post(WEBHOOK_PATH)
@@ -116,11 +141,13 @@ async def startup_event():
 
     asyncio.create_task(ping_self())
 
+
 @app.on_event("shutdown")
 async def shutdown_event():
     await bot_app.stop()
     await bot_app.shutdown()
     print("🛑 Бот остановлен")
+
 
 # ================== Стартовая страница ==================
 @app.get("/")
