@@ -36,7 +36,7 @@ async def inline_roll(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     title="✅❌ Случайный выбор",
                     description="Получи ответ — да или нет",
                     input_message_content=InputTextMessageContent(text),
-                    thumb_url="https://png.pngtree.com/png-clipart/20220221/ourmid/pngtree-3d-question-sign-front-view-png-image_4443823.png",
+                    thumb_url="https://cdn-icons-png.flaticon.com/512/17879/17879785.png",
                 )
             ],
             cache_time=0,
