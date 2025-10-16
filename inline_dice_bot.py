@@ -45,14 +45,14 @@ async def inline_roll(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     if query.lower() == "че" or query == "👀":
-        che_members = ["Мира", "Саша", "Митя", "Сева", "Лана", "Макс", "Алиса"]
+        che_members = ["Мира", "Саша"]
         chosen = random.choice(che_members)
         text = f"👀 Это: {chosen}"
         await update.inline_query.answer(
             results=[
                 InlineQueryResultArticle(
                     id=str(uuid.uuid4()),
-                    title="👩‍👩‍👦 Случайный выбор из семьи",
+                    title="👀 Случайный выбор из семьи",
                     description="Выбирает случайного Чернова",
                     input_message_content=InputTextMessageContent(text),
                     thumb_url="https://cdn-icons-png.flaticon.com/512/58/58992.png",
